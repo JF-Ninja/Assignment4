@@ -1,0 +1,162 @@
+import java.sql.*;
+import java.util.Scanner;
+
+interface ReservationStrategy {
+    void execute(Statement statement, Scanner scanner) throws SQLException;
+}
+
+class MakeReservationStrategy implements ReservationStrategy {
+    @Override
+    public void execute(Statement statement, Scanner scanner) throws SQLException {
+        System.out.print("Your name: ");
+        String userName = scanner.next();
+        System.out.print("Month: ");
+        int userMonth = scanner.nextInt();
+        System.out.print("Day: ");
+        int userDay = scanner.nextInt();
+        System.out.print("Hour: ");
+        int userHour = scanner.nextInt();
+        System.out.print("Minute: ");
+        int userMinute = scanner.nextInt();
+
+        ResultSet resultSet = statement.executeQuery("SELECT * FROM users WHERE month = " + userMonth +
+                " AND day = " + userDay + " AND hour = " + userHour + " AND minute = " + userMinute);
+        if (!resultSet.next()) {
+            PreparedStatement insertStatement = statement.getConnection().prepareStatement("INSERT INTO users VALUES (?, ?, ?, ?, ?)");
+            insertStatement.setString(1, userName);
+            insertStatement.setInt(2, userMonth);
+            insertStatement.setInt(3, userDay);
+            insertStatement.setInt(4, userHour);
+            insertStatement.setInt(5, userMinute);
+            insertStatement.executeUpdate();
+
+            System.out.println("Successful reservation");
+        } else {
+            System.out.println("This time is already reserved");
+        }
+    }
+}
+
+class PostponeReservationStrategy implements ReservationStrategy {
+    @Override
+    public void execute(Statement statement, Scanner scanner) throws SQLException {
+        System.out.print("Your name: ");
+        String userName = scanner.next();
+        System.out.print("Month: ");
+        int userMonth = scanner.nextInt();
+        System.out.print("Day: ");
+        int userDay = scanner.nextInt();
+        System.out.print("Hour: ");
+        int userHour = scanner.nextInt();
+        System.out.print("Minute: ");
+        int userMinute = scanner.nextInt();
+        ResultSet resultSet = statement.executeQuery("SELECT * FROM users WHERE name = '" + userName +
+                "' AND month = " + userMonth + " AND day = " + userDay +
+                " AND hour = " + userHour + " AND minute = " + userMinute);
+        if (!resultSet.next()) {
+            System.out.println("Reservation not found");
+        } else {
+            statement.executeUpdate("DELETE FROM users WHERE name = '" + userName +
+                    "' AND month = " + userMonth + " AND day = " + userDay +
+                    " AND hour = " + userHour + " AND minute = " + userMinute);
+            System.out.print("Enter new month: ");
+            int newMonth = scanner.nextInt();
+            System.out.print("Enter new day: ");
+            int newDay = scanner.nextInt();
+            System.out.print("Enter new hour: ");
+            int newHour = scanner.nextInt();
+            System.out.print("Enter new minute: ");
+            int newMinute = scanner.nextInt();
+            PreparedStatement insertStatement = statement.getConnection().prepareStatement("INSERT INTO users VALUES (?, ?, ?, ?, ?)");
+            insertStatement.setString(1, userName);
+            insertStatement.setInt(2, newMonth);
+            insertStatement.setInt(3, newDay);
+            insertStatement.setInt(4, newHour);
+            insertStatement.setInt(5, newMinute);
+            insertStatement.executeUpdate();
+            System.out.println("Your reservation has been saved");
+        }
+    }
+}
+
+class DeleteReservationStrategy implements ReservationStrategy {
+    @Override
+    public void execute(Statement statement, Scanner scanner) throws SQLException {
+        System.out.print("Your name: ");
+        String userName = scanner.next();
+        System.out.print("Month: ");
+        int userMonth = scanner.nextInt();
+        System.out.print("Day: ");
+        int userDay = scanner.nextInt();
+        System.out.print("Hour: ");
+        int userHour = scanner.nextInt();
+        System.out.print("Minute: ");
+        int userMinute = scanner.nextInt();
+
+        ResultSet resultSet = statement.executeQuery("SELECT * FROM users WHERE name = '" + userName +
+                "' AND month = " + userMonth + " AND day = " + userDay +
+                " AND hour = " + userHour + " AND minute = " + userMinute);
+        if (!resultSet.next()) {
+            System.out.println("Reservation not found");
+        } else {
+            statement.executeUpdate("DELETE FROM users WHERE name = '" + userName +
+                    "' AND month = " + userMonth + " AND day = " + userDay +
+                    " AND hour = " + userHour + " AND minute = " + userMinute);
+            System.out.println("Your reservation has been deleted");
+        }
+    }
+}
+
+class CheckBusyTimeStrategy implements ReservationStrategy {
+    @Override
+    public void execute(Statement statement, Scanner scanner) throws SQLException {
+        System.out.print("Month: ");
+        int userMonth = scanner.nextInt();
+        ResultSet resultSet = statement.executeQuery("SELECT day, hour, minute FROM users WHERE month = " + userMonth);
+        System.out.println("Time worked per month in format day month minute:");
+        while (resultSet.next()) {
+            int day = resultSet.getInt("day");
+            int hour = resultSet.getInt("hour");
+            int minute = resultSet.getInt("minute");
+            System.out.println(day + " " + hour + " " + minute);
+        }
+    }
+}
+
+public class Main {
+    private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=123456789";
+
+    public static void main(String[] args) {
+        try {
+            Scanner scanner = new Scanner(System.in);
+            Connection connection = DriverManager.getConnection(JDBC_URL);
+            Statement statement = connection.createStatement();
+            statement.execute("CREATE TABLE IF NOT EXISTS users (name TEXT, month INT, day INT, hour INT, minute INT)");
+
+            while (true) {
+                System.out.print("Select number:\n1. Make a reservation\n2. Postpone your reservation\n3. Delete your reservation\n4. Check busy time\nYour choice: ");
+                int choice = scanner.nextInt();
+                ReservationStrategy strategy = StrategyChoice.createStrategy(choice);
+                strategy.execute(statement, scanner);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class StrategyChoice{
+        public static ReservationStrategy createStrategy(int choice){
+        switch (choice) {
+            case 1:
+                return new MakeReservationStrategy();
+            case 2:
+                return new PostponeReservationStrategy();
+            case 3:
+                return new DeleteReservationStrategy();
+            case 4:
+                return new CheckBusyTimeStrategy();
+            default:
+                throw new IllegalArgumentException("Invalid choice");
+        }
+    }
+}
